@@ -1,21 +1,21 @@
-from keras.layers import Input, Lambda, Dense, Flatten
+from keras.layers import Input, Lambda, Dense, Flatten, BatchNormalization
 from keras.models import Model, Sequential
 from keras.applications.vgg16 import VGG16, preprocess_input
 import tensorflow as tf
 
-input_shape = (224,224,3)
+input_shape = (256,256,3)
 num_classes = 42
-def model(input_shape,num_classes):
+def model(input_shape):
 
-    vgg = VGG16(
-    include_top=False, weights="imagenet", input_tensor=None,
-    input_shape=input_shape)
-
+    #vgg = VGG16(include_top=False, weights="imagenet", input_tensor=None,input_shape=input_shape)
+    input = Input(input_shape)
+    vgg = VGG16(include_top=False, weights="imagenet", input_tensor=input)
     for layer in vgg.layers:
         layer.trainable=False
-    x = Flatten()(vgg.output)
-    #output = Dense(num_classes, activation="softmax")(x)
-    output = Dense(num_classes)(x)
+    x = BatchNormalization()(vgg.output)
+    x = Flatten()(x)
+    #output = Dense(42, activation="softmax")(x)
+    output = Dense(42,activation='relu')(x)#try adding activ and dropout after dense
     model = Model(vgg.input, output)
     """
     vgg.trainable=False
@@ -27,5 +27,5 @@ def model(input_shape,num_classes):
     model.summary()
     return model
 if __name__=="__main__":
-    model(input_shape,num_classes)
+    model(input_shape)
 

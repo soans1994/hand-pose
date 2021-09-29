@@ -9,8 +9,6 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import pickle
-from tqdm import tqdm
-import joblib
 
 train_labels = []
 for label_dir in tqdm(sorted(glob.glob("hand_labels/train/label/*.json")), total=1912):
@@ -84,25 +82,27 @@ num_classes = 42
 
 train_images = []
 for img_path in tqdm(sorted(glob.glob("hand_labels/train/crop/*.jpg")), total=1912):
-    img = cv2.imread(img_path)
+    img = cv2.imread(img_path,0)
     # img = cv2.resize(img, (size_x, size_y))
     train_images.append(img)
 "convert list to np array for ml processing"
 train_images = np.array(train_images)  # dtype:uint8
 #extra
-#train_images = train_images.astype(np.float32)
+train_images = train_images.astype(np.float32)
 train_images = train_images/255
+train_images = train_images.reshape(train_images.shape[0], 256, 256, 1)
 
 test_images = []
 for img_path in tqdm(sorted(glob.glob("hand_labels/test/crop/*.jpg")), total=846):
-    img = cv2.imread(img_path)
+    img = cv2.imread(img_path,0)
     # img = cv2.resize(img, (size_x, size_y))
     test_images.append(img)
 "convert list to np array for ml processing"
 test_images = np.array(test_images)  # dtype:uint8
 #extra
-#test_images = test_images.astype(np.float32)
+test_images = test_images.astype(np.float32)
 test_images = test_images/255
+test_images = test_images.reshape(test_images.shape[0], 256, 256, 1)
 
 print('Training image data: ' + str(train_images.shape))
 print('Training points data: ' + str(train_labels.shape))
@@ -120,135 +120,108 @@ def plot_keypoints(img, points):
         plt.scatter(points[i], points[i + 1], color='red')
         # cv2.circle(img, (int(points[i]), int(points[i + 1])), 3, (0, 255, 0), thickness=-1)  # , lineType=-1)#, shift=0)
     plt.show()
+#"""
+# does data augmentation by flipping the image
+def augment_data(img, points):
+    rows, cols, channel = img.shape
+    new_img = np.copy(img)
 
+    # flip the image
+    for i in range(256):
+        for j in range(128):
+            temp = img[i][j]
+            new_img[i][j] = img[i][cols - j - 1]
+            new_img[i][cols - j - 1] = temp
 
-import imgaug as ia
-import imgaug.augmenters as iaa
-from imgaug.augmentables import Keypoint, KeypointsOnImage
+    # flip the points
+    new_points = np.copy(points)
+    for i in range(0, 42, 2):
+        #new_points[i] = -points[i]
+        new_points[i] = 256-points[i]-1
+        #new_points[i] = 256 - points[i] # 1 pixel differnec
+
+    return new_img, new_points
+#"""
 """
-def rotate_aug(im_tr, pt_tr):
-    seq = iaa.Sequential([iaa.Affine(rotate=30, scale=(0.8, 1.2))])
-    aug_ims = []
-    aug_pts = []
-    coordlist = []
-    for im, pt in zip(im_tr, pt_tr):
-        xcoord = pt[0::2]
-        ycoord = pt[1::2]
-        for i in range(len(xcoord)):
-            coordlist.append(Keypoint(xcoord[i], ycoord[i]))
-        kps = KeypointsOnImage(coordlist, shape=im.shape)
-        f_im, f_kp = seq(image=im, keypoints=kps)
-        all_coords = []
-        for k in range(len(kps.keypoints)):
-            before = kps.keypoints[k]
-            after = f_kp.keypoints[k]
-            # print("Keypoint %d: (%.8f, %.8f) -> (%.8f, %.8f)" % (
-            #     i, before.x, before.y, after.x, after.y)
-            # )
-            all_coords.append(after.x)
-            all_coords.append(after.y)
-            all_coords_arr = np.asarray(all_coords)
-        aug_ims.append(im)
-        aug_ims.append(f_im)
-        aug_pts.append(pt)
-        aug_pts.append(all_coords)
-        coordlist.clear()
-    return np.asarray(aug_ims), np.asarray(aug_pts)
-
-train_images_aug, train_labels_aug = rotate_aug(train_images, train_labels)
+flip_img, flip_points = augment_data(train_images[0], train_labels[0])
+plot_keypoints(flip_img, flip_points)
+flip_img, flip_points = augment_data(train_images[1], train_labels[1])
+plot_keypoints(flip_img, flip_points)
+flip_img, flip_points = augment_data(train_images[19], train_labels[19])
+plot_keypoints(flip_img, flip_points)
+flip_img, flip_points = augment_data(train_images[20], train_labels[20])
+plot_keypoints(flip_img, flip_points)
+flip_img, flip_points = augment_data(train_images[50], train_labels[50])
+plot_keypoints(flip_img, flip_points)
+flip_img, flip_points = augment_data(train_images[60], train_labels[60])
+plot_keypoints(flip_img, flip_points)
+#plot_keypoints(train_images[0], train_labels[0])
+#plot_keypoints(train_images[1], train_labels[1])
+#plot_keypoints(train_images[19], train_labels[19])
+#plot_keypoints(train_images[20], train_labels[20])
+plot_keypoints(train_images[60], train_labels[60])
+plt.show()
 """
-def rotate_aug(im_tr, pt_tr):
-    seq = iaa.Sequential([iaa.Affine(rotate=30, scale=(0.8, 1.2))])
-    aug_ims = []
-    aug_pts = []
-    coordlist = []
-    for im, pt in zip(im_tr, pt_tr):
-        #xcoord = pt[0::2]
-        #ycoord = pt[1::2]
-        for i in range(len(pt[0::2])):
-            coordlist.append(Keypoint(pt[0::2][i], pt[1::2][i]))
-        kps = KeypointsOnImage(coordlist, shape=im.shape)
-        #f_im, f_kp = seq(image=im, keypoints=kps)
-        all_coords = []
-        for k in range(len(kps.keypoints)):
-            #before = kps.keypoints[k]
-            #after = seq(image=im, keypoints=kps)[1].keypoints[k]
-            # print("Keypoint %d: (%.8f, %.8f) -> (%.8f, %.8f)" % (
-            #     i, before.x, before.y, after.x, after.y)
-            # )
-            all_coords.append(seq(image=im, keypoints=kps)[1].keypoints[k].x)
-            all_coords.append(seq(image=im, keypoints=kps)[1].keypoints[k].y)
-            all_coords_arr = np.asarray(all_coords)
-        aug_ims.append(im)
-        aug_ims.append(seq(image=im, keypoints=kps)[0])
-        aug_pts.append(pt)
-        aug_pts.append(all_coords)
-        coordlist.clear()
-    return np.asarray(aug_ims), np.asarray(aug_pts)
-train_images_aug, train_labels_aug = rotate_aug(train_images, train_labels)
+train_images_aug = []
+train_labels_aug = []
 
+#"""
+# apply flipping operation
+for i in tqdm(range(0, train_images.shape[0])):
+    aug_img, aug_point = augment_data(train_images[i], train_labels[i])
+    # original data
+    train_images_aug.append(train_images[i])
+    train_labels_aug.append(train_labels[i])
+
+    # augmented data
+    train_images_aug.append(aug_img)
+    train_labels_aug.append(aug_point)
+"""
+# convert to numpy
+"""
+train_images_aug = np.array(train_images_aug)
+train_labels_aug = np.copy(train_labels_aug)
+"""
+"""
 print('Training image data: ' + str(train_images_aug.shape))
 print('Training points data: ' + str(train_labels_aug.shape))
 print('Testing image data: ' + str(test_images.shape))
 print('Testing points data: ' + str(test_labels.shape))
-
-def flip_im_points0(img, points):
-  flip_im = np.fliplr(img)
-  xcoords = points[0::2]
-  ycoords = points[1::2]
-  new_points = []
-  for i in range(len(xcoords)):
-    xp = xcoords[i]
-    yp = ycoords[i]
-    new_points.append(256-xp)
-    new_points.append(yp)
-  return flip_im, np.asarray(new_points)
-
-def aug_flip0(im_tr, pt_tr):
-  aug_ims = []
-  aug_pts = []
-  for im, pt in zip(im_tr, pt_tr):
-    f_im, f_pts = flip_im_points0(im, pt)
-    aug_ims.append(im)
-    aug_ims.append(f_im)
-    aug_pts.append(pt)
-    aug_pts.append(f_pts)
-  return np.asarray(aug_ims), np.asarray(aug_pts)
-
-train_images_aug, train_labels_aug = aug_flip0(train_images_aug, train_labels_aug)
-
-print('Training image data: ' + str(train_images_aug.shape))
-print('Training points data: ' + str(train_labels_aug.shape))
-print('Testing image data: ' + str(test_images.shape))
-print('Testing points data: ' + str(test_labels.shape))
-
-
+"""
 id = 50
 #plot_keypoints(train_images_aug[id], train_labels_aug[id])
 plot_keypoints(train_images[id], train_labels[id])
 """
-pickle_out = open("x_train_aug2.pickle","wb")
+fig = plt.figure(figsize=(20,20))
+for i in range(16):
+    fig.add_subplot(4, 4, i + 1, xticks=[], yticks=[])
+    plot_keypoints(train_images_aug[i], train_labels_aug[i])
+plt.show()
+
+# train_images = train_images.reshape(train_images.shape[0], 256, 256, 1)
+#train_images2 = train_images.reshape(train_images.shape[0], 256, 256, 3)
+#img_height = train_images2.shape[1]
+#img_width = train_images2.shape[2]
+#img_channels = train_images2.shape[3]
+img_height = 256
+img_width = 256
+img_channels = 1
+input_shape = (img_height, img_width, img_channels)
+print(input_shape)
+
+pickle_out = open("x_train.pickle2","wb")
 pickle.dump(train_images_aug, pickle_out)
 pickle_out.close()
-pickle_out = open("y_train_aug2.pickle","wb")
+pickle_out = open("y_train.pickle2","wb")
 pickle.dump(train_labels_aug, pickle_out)
 pickle_out.close()
 
-pickle_out = open("x_test.pickle","wb")
+pickle_out = open("x_test.pickle2","wb")
 pickle.dump(test_images, pickle_out)
 pickle_out.close()
-pickle_out = open("y_test.pickle","wb")
+pickle_out = open("y_test.pickle2","wb")
 pickle.dump(test_labels, pickle_out)
 pickle_out.close()
-"""
-"""
-np.save('xtrain.npy', train_images_aug)
-np.save('ytrain.npy', train_labels_aug)
-np.save('xtest.npy', test_images)
-np.save('ytest.npy', test_labels)
-"""
-joblib.dump(train_images_aug, 'x_train.joblib')
-joblib.dump(train_labels_aug, 'y_train.joblib')
-joblib.dump(test_images, 'x_test.joblib')
-joblib.dump(test_labels, 'y_test.joblib')
+
+
 a=1

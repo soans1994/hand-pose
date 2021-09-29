@@ -1,8 +1,4 @@
-"""
-Process CMU Hand dataset to get cropped hand datasets.
-"""
-import os
-import pickle
+import glob as glob
 import tensorflow as tf
 import keras
 import numpy as np
@@ -12,30 +8,17 @@ from simplevgg import model
 #from iunet2 import model
 #from vgg16 import model
 #from vgg19 import model
+from resnet50 import model
+#from inceptionv3 import model
 #from vgg162 import model
 #from mobilenetv2 import model
 #from mobilenetv2 import model
 from matplotlib import pyplot as plt
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
-import joblib
+from load_numpy_data2 import generator
+#from load_numpy_dataforold import generator
 
-#train_images = np.load('xtrain.npy', mmap_mode='r')
-#train_labels = np.load('ytrain.npy', mmap_mode='r')
-#test_images = np.load('xtest.npy', mmap_mode='r')
-#test_labels = np.load('ytest.npy', mmap_mode='r')
 
-#train_images = np.load('x_train.pickle', allow_pickle=True)
-#train_labels = np.load('y_train.pickle', allow_pickle=True)
-#test_images = np.load('x_test.pickle', allow_pickle=True)
-#test_labels = np.load('y_test.pickle', allow_pickle=True)
-
-train_images = joblib.load('x_train.joblib')
-train_labels = joblib.load('y_train.joblib')
-test_images = joblib.load('x_test.joblib')
-test_labels = joblib.load('y_test.joblib')
-
-#train_images = train_images.astype(np.float64)
-#test_images = test_images.astype(np.float64)
 
 # plots keypoints on face image
 def plot_keypoints(img, points):
@@ -49,38 +32,27 @@ def plot_keypoints(img, points):
         # cv2.circle(img, (int(points[i]), int(points[i + 1])), 3, (0, 255, 0), thickness=-1)  # , lineType=-1)#, shift=0)
     plt.show()
 
+samples = sorted(glob.glob("hand_labels_synth/synth23/*.jpg"))
+samples2 = sorted(glob.glob("hand_labels_synth/synth23val/*.jpg"))
+#samples = sorted(glob.glob("hand_labels/train/crop/*.jpg"))
+#samples2 = sorted(glob.glob("hand_labels/test/crop/*.jpg"))
+#train_images, train_labels = generator(samples, batch_size=32, aug=None)#, aug=train_aug)
+train_generator = generator(samples, batch_size=64, aug=None)#, aug=train_aug)
+validation_generator = generator(samples2, batch_size=64, aug=None)#, aug=train_aug)
+print(len(train_generator), len(validation_generator))
+#train_generator = DataGenerator(train_images, train_labels, batch_size = 32)#119 batches(3824/32)
+#validation_generator = DataGenerator(test_images, test_labels, batch_size = 32)
+for i,j in train_generator:
+    print(i.shape, j.shape)
+    print(i[0].shape, j[0].shape)
+    break
+id = 15
+plot_keypoints(i[id], j[id])
 
-id = 150
-plot_keypoints(train_images[id], train_labels[id])
-
-# train_images = train_images.reshape(train_images.shape[0], 256, 256, 1)
-train_images = train_images.reshape(train_images.shape[0], 256, 256, 3)#3824,256,256,3
-img_height = train_images.shape[1]
-img_width = train_images.shape[2]
-img_channels = train_images.shape[3]
-input_shape = (img_height, img_width, img_channels)
+input_shape = (368, 368, 3)
+#input_shape = (256, 256, 3)
 num_classes = 42
 print(input_shape)
-
-##############adddddddddddddddddd################
-class DataGenerator(keras.utils.Sequence):
-  def __init__(self, x_data, y_data, batch_size):
-    self.x, self.y = x_data, y_data
-    self.batch_size = batch_size
-    self.num_batches = np.ceil(len(x_data) / batch_size)
-    self.batch_idx = np.array_split(range(len(x_data)), self.num_batches)
-
-  def __len__(self):
-    return len(self.batch_idx)
-
-  def __getitem__(self, idx):
-    batch_x = self.x[self.batch_idx[idx]]
-    batch_y = self.y[self.batch_idx[idx]]
-    return batch_x, batch_y
-
-#################ADD###############
-train_generator = DataGenerator(train_images, train_labels, batch_size = 32)#119 batches(3824/32)
-validation_generator = DataGenerator(test_images, test_labels, batch_size = 32)
 
 def get_model():
     return model(input_shape)
@@ -96,21 +68,22 @@ model.compile(optimizer=keras.optimizers.Adam(1e-3), loss="mse", metrics=["accur
 #model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])  # default lr 0.001,1e-3
 
 #lr = 1e-3
-callbacks = [ModelCheckpoint("test.hdf5", verbose=1, save_best_only=True)]#,
-             #ReduceLROnPlateau(monitor="val_loss", patience=20, factor=0.1, verbose=1, min_lr=1e-6, ),# sdnt go below min_lr
-             #EarlyStopping(monitor="val_loss", patience=20, verbose=1)]
+callbacks = [ModelCheckpoint("test.hdf5", verbose=1, save_best_only=True),
+             ReduceLROnPlateau(monitor="val_loss", patience=10, factor=0.1, verbose=1, min_lr=1e-6, ),# sdnt go below min_lr
+             EarlyStopping(monitor="val_loss", patience=10, verbose=1)]
 # history = model.fit(x_train, y_train, batch_size=32, verbose=1, epochs= 500, validation_data=(x_test, y_test), shuffle=False) #callbacks=callbacks)#, class_weight=class_weights )
 #history = model.fit(train_images, train_labels, batch_size=32, verbose=1, epochs=300, validation_split=0.3,shuffle=False, callbacks=callbacks)#
-history = model.fit(train_generator, verbose=1, epochs=500, validation_data=validation_generator,shuffle=False, callbacks=callbacks)#
+history = model.fit(train_generator, verbose=1, epochs=500, validation_data=validation_generator, shuffle=False, callbacks=callbacks)#
 # history = model.fit(x_train, y_train_cat, batch_size=2, verbose=1, epochs= 10, validation_data=(x_test, y_test_cat), shuffle=False)#, class_weight=class_weights )
 # shuffle true sshuffles only the training data for every epoch. but may be we need same for checking imporved models.
 #model.save("test.hdf5")
 
-# test_images = test_images.reshape(test_images.shape[0], 256, 256, 1)
-test_images = test_images.reshape(test_images.shape[0], 256, 256, 3)
-_, acc = model.evaluate(test_images, test_labels)
+
+#_, acc = model.evaluate(test_images, test_labels)
+_, acc = model.evaluate(validation_generator)
 print("Accuracy of test set:", (acc * 100.0), "%")
-_, acc = model.evaluate(train_images, train_labels)
+#_, acc = model.evaluate(train_images, train_labels)
+_, acc = model.evaluate(train_generator)
 print("Accuracy of train set:", (acc * 100.0), "%")
 
 # plot train val acc loss

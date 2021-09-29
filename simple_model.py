@@ -32,7 +32,7 @@ def model(input):
     return model
 #"""
 if __name__=="__main__":
-    input_shape = (256,256,3)
+    input_shape = (256,256, 3)
     model = model(input_shape)
 
 #"""

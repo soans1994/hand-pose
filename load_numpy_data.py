@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import pickle
+import joblib
 
 train_labels = []
 for label_dir in tqdm(sorted(glob.glob("hand_labels/train/label/*.json")), total=1912):
@@ -118,7 +119,7 @@ def plot_keypoints(img, points):
         plt.scatter(points[i], points[i + 1], color='red')
         # cv2.circle(img, (int(points[i]), int(points[i + 1])), 3, (0, 255, 0), thickness=-1)  # , lineType=-1)#, shift=0)
     plt.show()
-"""
+#"""
 # does data augmentation by flipping the image
 def augment_data(img, points):
     rows, cols, channel = img.shape
@@ -139,7 +140,7 @@ def augment_data(img, points):
         #new_points[i] = 256 - points[i] # 1 pixel differnec
 
     return new_img, new_points
-"""
+#"""
 """
 flip_img, flip_points = augment_data(train_images[0], train_labels[0])
 plot_keypoints(flip_img, flip_points)
@@ -159,11 +160,11 @@ plot_keypoints(flip_img, flip_points)
 #plot_keypoints(train_images[20], train_labels[20])
 plot_keypoints(train_images[60], train_labels[60])
 plt.show()
-
+"""
 train_images_aug = []
 train_labels_aug = []
-"""
-"""
+
+#"""
 # apply flipping operation
 for i in tqdm(range(0, train_images.shape[0])):
     aug_img, aug_point = augment_data(train_images[i], train_labels[i])
@@ -195,27 +196,33 @@ for i in range(16):
     fig.add_subplot(4, 4, i + 1, xticks=[], yticks=[])
     plot_keypoints(train_images_aug[i], train_labels_aug[i])
 plt.show()
-"""
+
 # train_images = train_images.reshape(train_images.shape[0], 256, 256, 1)
-train_images2 = train_images.reshape(train_images.shape[0], 256, 256, 3)
-img_height = train_images2.shape[1]
-img_width = train_images2.shape[2]
-img_channels = train_images2.shape[3]
+#train_images2 = train_images.reshape(train_images.shape[0], 256, 256, 3)
+#img_height = train_images2.shape[1]
+#img_width = train_images2.shape[2]
+#img_channels = train_images2.shape[3]
+img_height = 256
+img_width = 256
+img_channels = 3
 input_shape = (img_height, img_width, img_channels)
 print(input_shape)
-
-pickle_out = open("x_train.pickle","wb")
-pickle.dump(train_images, pickle_out)
+"""
+pickle_out = open("x_train.pickle","wb" )
+pickle.dump(train_images_aug, pickle_out)
 pickle_out.close()
 pickle_out = open("y_train.pickle","wb")
-pickle.dump(train_labels, pickle_out)
+pickle.dump(train_labels_aug, pickle_out)
 pickle_out.close()
-
 pickle_out = open("x_test.pickle","wb")
 pickle.dump(test_images, pickle_out)
 pickle_out.close()
 pickle_out = open("y_test.pickle","wb")
 pickle.dump(test_labels, pickle_out)
 pickle_out.close()
-
+"""
+joblib.dump(train_images_aug, 'x_train.joblib')
+joblib.dump(train_labels_aug, 'y_train.joblib')
+joblib.dump(test_images, 'x_test.joblib')
+joblib.dump(test_labels, 'y_test.joblib')
 a=1
